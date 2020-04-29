@@ -2,6 +2,7 @@
 local m, s, o
 local openclash = "openclash"
 local uci = luci.model.uci.cursor()
+local fs = require "luci.openclash"
 
 font_red = [[<font color="red">]]
 font_off = [[</font>]]
@@ -57,12 +58,54 @@ function s.create(...)
 	end
 end
 
+o = s:option(DummyValue, "config", translate("Config File"))
+function o.cfgvalue(...)
+	return Value.cfgvalue(...) or translate("all")
+end
+
 o = s:option(DummyValue, "type", translate("Group Type"))
 function o.cfgvalue(...)
 	return Value.cfgvalue(...) or translate("None")
 end
 
 o = s:option(DummyValue, "name", translate("Group Name"))
+function o.cfgvalue(...)
+	return Value.cfgvalue(...) or translate("None")
+end
+
+-- [[ Proxy-Provider Manage ]]--
+s = m:section(TypedSection, "proxy-provider", translate("Proxy-Provider"))
+s.anonymous = true
+s.addremove = true
+s.sortable = true
+s.template = "cbi/tblsection"
+s.extedit = luci.dispatcher.build_url("admin/services/openclash/proxy-provider-config/%s")
+function s.create(...)
+	local sid = TypedSection.create(...)
+	if sid then
+		luci.http.redirect(s.extedit % sid)
+		return
+	end
+end
+
+o = s:option(Flag, "enabled", translate("Enable"))
+o.rmempty     = false
+o.default     = o.enabled
+o.cfgvalue    = function(...)
+    return Flag.cfgvalue(...) or "1"
+end
+
+o = s:option(DummyValue, "config", translate("Config File"))
+function o.cfgvalue(...)
+	return Value.cfgvalue(...) or translate("all")
+end
+
+o = s:option(DummyValue, "type", translate("Provider Type"))
+function o.cfgvalue(...)
+	return Value.cfgvalue(...) or translate("None")
+end
+
+o = s:option(DummyValue, "name", translate("Provider Name"))
 function o.cfgvalue(...)
 	return Value.cfgvalue(...) or translate("None")
 end
@@ -90,6 +133,11 @@ o.cfgvalue    = function(...)
     return Flag.cfgvalue(...) or "1"
 end
 
+o = s:option(DummyValue, "config", translate("Config File"))
+function o.cfgvalue(...)
+	return Value.cfgvalue(...) or translate("all")
+end
+
 o = s:option(DummyValue, "type", translate("Type"))
 function o.cfgvalue(...)
 	return Value.cfgvalue(...) or translate("None")
@@ -115,7 +163,7 @@ o.template="openclash/ping"
 o.width="10%"
 
 local tt = {
-    {Delete_Unused_Servers, Delete_Severs, Delete_Groups}
+    {Delete_Unused_Servers, Delete_Severs, Delete_Proxy_Provider, Delete_Groups}
 }
 
 b = m:section(Table, tt)
@@ -136,6 +184,16 @@ o.inputstyle = "reset"
 o.write = function()
   m.uci:set("openclash", "config", "enable", 0)
   m.uci:delete_all("openclash", "servers", function(s) return true end)
+  m.uci:commit("openclash")
+  luci.http.redirect(luci.dispatcher.build_url("admin", "services", "openclash", "servers"))
+end
+
+o = b:option(Button,"Delete_Proxy_Provider")
+o.inputtitle = translate("Delete Proxy Provider")
+o.inputstyle = "reset"
+o.write = function()
+  m.uci:set("openclash", "config", "enable", 0)
+  m.uci:delete_all("openclash", "proxy-provider", function(s) return true end)
   m.uci:commit("openclash")
   luci.http.redirect(luci.dispatcher.build_url("admin", "services", "openclash", "servers"))
 end
@@ -170,6 +228,7 @@ o = a:option(Button, "Commit")
 o.inputtitle = translate("Commit Configurations")
 o.inputstyle = "apply"
 o.write = function()
+	fs.unlink("/tmp/Proxy_Group")
   m.uci:set("openclash", "config", "enable", 0)
   m.uci:commit("openclash")
 end
@@ -178,6 +237,7 @@ o = a:option(Button, "Apply")
 o.inputtitle = translate("Apply Configurations")
 o.inputstyle = "apply"
 o.write = function()
+	fs.unlink("/tmp/Proxy_Group")
   m.uci:set("openclash", "config", "enable", 0)
   m.uci:commit("openclash")
   luci.sys.call("/usr/share/openclash/yml_groups_set.sh >/dev/null 2>&1 &")

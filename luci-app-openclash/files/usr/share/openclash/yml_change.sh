@@ -90,15 +90,32 @@
        else
           sed -i "/^dns:/i\external-controller: ${controller_address}:${5}" "$7"
        fi
+       uci set openclash.config.config_reload=0
     fi
     
-    if [ -z "$(grep '^secret: $4' "$7")" ]; then
+    if [ -z "$(grep '^secret: \"$4\"' "$7")" ]; then
        if [ ! -z "$(grep "^ \{0,\}secret:" "$7")" ]; then
           sed -i "/^ \{0,\}secret:/c\secret: \"${4}\"" "$7"
        else
           sed -i "/^dns:/i\secret: \"${4}\"" "$7"
        fi
+       uci set openclash.config.config_reload=0
     fi
+    
+    if [ -z "$(grep "^ \{0,\}device-url:" "$7")" ] && [ "$15" -eq 2 ]; then
+       uci set openclash.config.config_reload=0
+    elif [ -z "$(grep "^ \{0,\}tun:" "$7")" ] && [ -n "$15" ]; then
+       uci set openclash.config.config_reload=0
+    elif [ -n "$(grep "^ \{0,\}tun:" "$7")" ] && [ -z "$15" ]; then
+       uci set openclash.config.config_reload=0
+    elif [ -n "$(grep "^ \{0,\}device-url:" "$7")" ] && [ "$15" -eq 1 ]; then
+       uci set openclash.config.config_reload=0
+    fi
+    
+    uci commit openclash
+    sed -i '/^ \{0,\}tun:/,/^ \{0,\}enable:/d' "$7" 2>/dev/null
+    sed -i '/^ \{0,\}device-url:/d' "$7" 2>/dev/null
+    sed -i '/^ \{0,\}dns-listen:/d' "$7" 2>/dev/null
 
     if [ -z "$(grep "^   enable: true" "$7")" ]; then
        if [ ! -z "$(grep "^ \{0,\}enable:" "$7")" ]; then
@@ -144,6 +161,16 @@
           fi
        fi
     fi
+#TUN
+    if [ "$15" -eq 1 ]; then
+       sed -i "/^dns:/i\tun:" "$7"
+       sed -i "/^dns:/i\  enable: true" "$7"
+    elif [ ! -z "$15" ]; then
+       sed -i "/^dns:/i\tun:" "$7"
+       sed -i "/^dns:/i\  enable: true" "$7"
+       sed -i "/^dns:/i\  device-url: dev://clash0" "$7"
+       sed -i "/^dns:/i\  dns-listen: 0.0.0.0:53" "$7"
+    fi
 
 #添加自定义Hosts设置
 	   
@@ -157,6 +184,6 @@
 	     fi
        sed -i '/^hosts:/a\##Custom HOSTS END##' "$7" 2>/dev/null
        sed -i '/^hosts:/a\##Custom HOSTS##' "$7" 2>/dev/null
-	     sed -i '/##Custom HOSTS##/r/etc/config/openclash_custom_hosts.list' "$7" 2>/dev/null
+	     sed -i '/##Custom HOSTS##/r/etc/openclash/custom/openclash_custom_hosts.list' "$7" 2>/dev/null
 	     sed -i "/^hosts:/,/^dns:/ {s/^ \{0,\}'/  '/}" "$7" 2>/dev/null #修改参数空格
 	  fi
